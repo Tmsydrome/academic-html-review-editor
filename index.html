@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML修订批注工具 v0.3.4</title>
+<style>
+:root{--bg:#e9eef3;--panel:#fff;--ink:#17212b;--muted:#687787;--line:#d5dce3;--accent:#2563eb;--paper:#fff;--paper-ink:#222}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:600 14px "Microsoft YaHei",Arial,sans-serif;transition:.2s}
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--panel) 94%,transparent);border-bottom:1px solid var(--line);backdrop-filter:blur(12px);box-shadow:0 2px 12px #13253b12}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;max-width:1600px;margin:auto;padding:9px 14px}.brand{font-weight:700;margin-right:5px;white-space:nowrap}.group{display:flex;gap:5px;padding-right:7px;border-right:1px solid var(--line)}
+button,select,input[type=color]{height:34px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}button,select{padding:0 10px}button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}button:disabled,select:disabled{opacity:.42;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);color:#fff}.primary:hover:not(:disabled){color:#fff;filter:brightness(.95)}
+.swatch{flex:0 0 25px;width:25px;height:25px;padding:0;border-radius:50%}.swatch[data-theme=white]{background:#dfe5eb}.swatch[data-theme=green]{background:#b9d3be}.swatch[data-theme=wood]{background:#d4b98f}.swatch[data-theme=dark]{background:#171b20}.swatch.active{outline:2px solid var(--accent);outline-offset:2px}input[type=color]{width:34px;padding:3px}
+#status{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;height:calc(100vh - 55px);padding:12px}.paper,aside{border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 6px 20px #2030400d;overflow:hidden}.paper iframe{width:100%;height:100%;border:0;display:block;background:var(--paper)}
+aside{padding:14px;overflow:auto}aside h2{margin:0 0 10px;font-size:15px}.comment{margin:8px 0;padding:9px;border-left:3px solid #d2a800;border-radius:4px;background:#fff8d7;color:#252525;cursor:pointer}.comment small{display:block;margin-top:5px;color:#6b7784}.empty{color:var(--muted);font-size:12px;line-height:1.65}
+#drop{position:fixed;inset:72px 22px 22px;z-index:20;display:grid;place-items:center;border:2px dashed #91a2b4;border-radius:14px;background:color-mix(in srgb,var(--panel) 94%,transparent);text-align:center;color:var(--muted);backdrop-filter:blur(8px)}#drop strong{display:block;margin-bottom:7px;color:var(--ink);font-size:21px}#drop.hidden{display:none}
+@media(max-width:1050px){.brand{width:100%}#status{width:100%;margin:0}.layout{height:calc(100vh - 94px)}}@media(max-width:780px){.layout{grid-template-columns:1fr;height:auto}.paper{height:72vh}aside{height:25vh}.group{border:0}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <span class="brand">HTML修订批注工具</span>
+  <div class="group"><button id="open" class="primary">导入HTML</button><select id="mode" disabled><option value="track">修订模式</option><option value="edit">直接编辑</option></select></div>
+  <div class="group"><button id="undo" disabled title="Ctrl+Z">撤销</button><button id="redo" disabled title="Ctrl+Y / Ctrl+Shift+Z">重做</button><button id="toggle" disabled>隐藏修订</button></div>
+  <div class="group"><button id="comment" disabled>添加批注</button><button id="accept" disabled>接受所选</button><button id="reject" disabled>拒绝所选</button><button id="acceptAll" disabled>接受全部</button><button id="rejectAll" disabled>拒绝全部</button></div>
+  <div class="group"><select id="exportType" disabled><option value="review">修订＋批注版</option><option value="clean">清洁＋批注版</option></select><button id="export" disabled>导出所选版本</button></div>
+  <div class="group" title="编辑界面主题，导出统一为白色"><button class="swatch active" data-theme="white" aria-label="浅色"></button><button class="swatch" data-theme="green" aria-label="护眼绿"></button><button class="swatch" data-theme="wood" aria-label="木质"></button><button class="swatch" data-theme="dark" aria-label="深色"></button><input id="customColor" type="color" value="#e9eef3" title="自定义背景色"></div>
+  <span id="status">等待导入HTML</span>
+</div></header>
+<div class="layout"><section class="paper"><iframe id="frame" sandbox="allow-same-origin"></iframe></section><aside><h2>批注</h2><div id="comments" class="empty">选中文字后添加给AI的具体编辑要求。</div></aside></div>
+<div id="drop"><div><strong>拖入需要编辑的HTML</strong>或点击“导入HTML”</div></div>
+<input id="file" type="file" accept=".html,.htm,text/html" hidden>
+<script>
+const $=q=>document.querySelector(q),frame=$('#frame'),mode=$('#mode'),statusEl=$('#status');
+let fileName='document.html',ready=false,commentNo=0,showMarks=true,undoStack=[],redoStack=[],compositionInfo=null;
+const doc=()=>frame.contentDocument,win=()=>frame.contentWindow,selection=()=>win().getSelection(),status=t=>statusEl.textContent=t;
+const editorStyle=`<style id="review-tool-style">body.review-editing{outline:none;background:var(--editor-paper,#fff)!important;color:var(--editor-ink,#222)!important;min-height:100vh}ins[data-change]{color:#1565c0;text-decoration:underline;background:#e9f3ff}del[data-change]{color:#c62828;text-decoration:line-through;background:#ffeded}.review-comment{background:#fff0a8;border-bottom:2px solid #d2a800}.hide-review del[data-change]{display:none}.hide-review ins[data-change]{color:inherit;text-decoration:none;background:none}</style>`;
+const snapshot=()=>({html:doc().body.innerHTML,commentNo});
+function push(state=snapshot()){if(undoStack.at(-1)?.html===state.html)return;undoStack.push(state);redoStack=[];historyButtons()}
+function restore(state){doc().body.innerHTML=state.html;commentNo=state.commentNo;doc().body.contentEditable='true';doc().body.classList.toggle('hide-review',!showMarks);drawComments();historyButtons()}
+function historyButtons(){$('#undo').disabled=!ready||!undoStack.length;$('#redo').disabled=!ready||!redoStack.length}
+function undo(){if(!undoStack.length)return;redoStack.push(snapshot());restore(undoStack.pop());status('已撤销')}
+function redo(){if(!redoStack.length)return;undoStack.push(snapshot());restore(redoStack.pop());status('已重做')}
+
+async function load(file){
+  if(!file?.name.match(/\.html?$/i))return status('请选择HTML文件');fileName=file.name;
+  frame.srcdoc=(await file.text()).replace(/<\/head>/i,editorStyle+'</head>');
+  frame.onload=()=>{ready=true;undoStack=[];redoStack=[];commentNo=0;const d=doc();d.body.classList.add('review-editing');d.addEventListener('beforeinput',beforeInput,true);d.addEventListener('paste',paste,true);d.addEventListener('compositionstart',compositionStart);d.addEventListener('compositionend',compositionEnd);d.addEventListener('keydown',shortcuts,true);setMode('track');document.querySelectorAll('button:not(#open),select').forEach(x=>x.disabled=false);historyButtons();$('#drop').classList.add('hidden');applyTheme(currentTheme);drawComments();status('已导入并进入修订模式：'+fileName)};
+}
+function setMode(v){doc().body.contentEditable='true';mode.value=v;status(v==='edit'?'直接编辑模式':'修订模式')}
+function change(tag,text=''){const n=doc().createElement(tag);n.dataset.change='1';n.textContent=text;return n}
+function put(text,br=false){const x=selection();if(!x.rangeCount)return;const r=x.getRangeAt(0),p=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement,existing=p.closest('ins[data-change]');if(!r.collapsed)deleteRange(r);const n=existing?(br?doc().createElement('br'):doc().createTextNode(text||'')):change('ins',text||'');if(!existing&&br)n.appendChild(doc().createElement('br'));r.insertNode(n);r.setStartAfter(n);r.collapse(true);x.removeAllRanges();x.addRange(r)}
+function deleteRange(r){if(r.collapsed)return;const common=r.commonAncestorContainer.nodeType===1?r.commonAncestorContainer:r.commonAncestorContainer.parentElement;if(common.closest('ins[data-change]')){r.deleteContents();return}const n=change('del');n.appendChild(r.extractContents());r.insertNode(n);r.setStartAfter(n);r.collapse(true)}
+function usable(n){return n?.nodeType===3&&n.length&&!n.parentElement.closest('del[data-change],script,style')}
+function edgeText(node,last){if(!node)return null;if(usable(node))return node;if(node.nodeType===1&&node.closest('del[data-change],script,style'))return null;const kids=[...node.childNodes];if(last)kids.reverse();for(const k of kids){const found=edgeText(k,last);if(found)return found}return null}
+function adjacent(back){const x=selection();if(!x.rangeCount)return null;const r=x.getRangeAt(0),c=r.startContainer,o=r.startOffset;if(c.nodeType===3){if(back&&o>0)return[c,o-1];if(!back&&o<c.length)return[c,o];let n=c;while(n&&n!==doc().body){const sib=back?n.previousSibling:n.nextSibling;if(sib){const t=edgeText(sib,back);if(t)return[t,back?t.length-1:0]}n=n.parentNode}}
+  else{const child=back?c.childNodes[o-1]:c.childNodes[o];const t=edgeText(child,back);if(t)return[t,back?t.length-1:0];let n=c;while(n&&n!==doc().body){const sib=back?n.previousSibling:n.nextSibling;if(sib){const q=edgeText(sib,back);if(q)return[q,back?q.length-1:0]}n=n.parentNode}}return null}
+function erase(back){const x=selection();if(!x.rangeCount)return;const r=x.getRangeAt(0);if(!r.collapsed)return deleteRange(r);const hit=adjacent(back);if(!hit)return;const[n,o]=hit,q=doc().createRange();q.setStart(n,o);q.setEnd(n,o+1);const ins=n.parentElement.closest('ins[data-change]');if(ins){q.deleteContents();if(!ins.textContent&&!ins.querySelector('br'))ins.remove()}else deleteRange(q)}
+function beforeInput(e){if(e.isComposing)return;const t=e.inputType||'';
+  if(mode.value==='edit'){push();return}
+  if(['insertText','insertParagraph','insertLineBreak'].includes(t)){e.preventDefault();push();put(e.data,t!=='insertText')}
+  else if(t.startsWith('delete')){e.preventDefault();push();erase(t.includes('Backward'))}
+}
+function paste(e){if(mode.value!=='track')return;e.preventDefault();push();put(e.clipboardData.getData('text/plain'))}
+function compositionStart(){
+  const x=selection();if(!x.rangeCount)return;const r=x.getRangeAt(0),parent=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement;
+  compositionInfo={state:snapshot(),inInsert:!!parent.closest('ins[data-change]'),fragment:null,start:null,end:null};
+  if(mode.value!=='track'||r.collapsed)return;
+  compositionInfo.fragment=r.cloneContents();const start=doc().createElement('span'),end=doc().createElement('span');start.dataset.compositionBoundary='start';end.dataset.compositionBoundary='end';
+  const a=r.cloneRange(),b=r.cloneRange();b.collapse(false);b.insertNode(end);a.collapse(true);a.insertNode(start);const q=doc().createRange();q.setStartAfter(start);q.setEndBefore(end);x.removeAllRanges();x.addRange(q);compositionInfo.start=start;compositionInfo.end=end;
+}
+function compositionEnd(e){
+  const info=compositionInfo;compositionInfo=null;if(!info)return;if(mode.value==='edit'){push(info.state);return}if(mode.value!=='track')return;if(!e.data){if(info.start?.isConnected)restore(info.state);return}push(info.state);
+  const x=selection();
+  if(info.start?.isConnected&&info.end?.isConnected){const q=doc().createRange();q.setStartAfter(info.start);q.setEndBefore(info.end);q.deleteContents();if(info.inInsert){const text=doc().createTextNode(e.data);q.insertNode(text);info.start.remove();info.end.remove();q.setStartAfter(text)}else{const deleted=change('del'),inserted=change('ins',e.data);deleted.appendChild(info.fragment);q.insertNode(deleted);q.setStartAfter(deleted);q.insertNode(inserted);info.start.remove();info.end.remove();q.setStartAfter(inserted)}q.collapse(true);x.removeAllRanges();x.addRange(q);return}
+  if(info.inInsert)return;if(!x.rangeCount)return;const r=x.getRangeAt(0),n=r.startContainer,o=r.startOffset,parent=n.nodeType===1?n:n.parentElement;if(parent.closest('ins[data-change]'))return;
+  if(n.nodeType===3&&o>=e.data.length){const q=doc().createRange();q.setStart(n,o-e.data.length);q.setEnd(n,o);const ins=change('ins');ins.appendChild(q.extractContents());q.insertNode(ins);q.setStartAfter(ins);q.collapse(true);x.removeAllRanges();x.addRange(q)}
+}
+function shortcuts(e){if(!(e.ctrlKey||e.metaKey))return;const k=e.key.toLowerCase();if(k==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if(k==='y'){e.preventDefault();redo()}}
+function chosen(){const x=selection();if(!x.rangeCount)return null;const n=x.anchorNode;return(n.nodeType===1?n:n.parentElement)?.closest('ins[data-change],del[data-change]')}
+function unwrap(n){n.replaceWith(...n.childNodes)}function acceptNode(n){if(n)n.tagName==='DEL'?n.remove():unwrap(n)}function rejectNode(n){if(n)n.tagName==='INS'?n.remove():unwrap(n)}
+function heading(node){for(let n=node;n;n=n.parentElement){let p=n.previousElementSibling;while(p){if(/^H[1-6]$/.test(p.tagName))return p.textContent.trim();p=p.previousElementSibling}}return'未识别章节'}
+function addComment(){const x=selection();if(!x.rangeCount||x.isCollapsed)return status('请先选择需要批注的文字');const request=prompt('请输入给AI的编辑要求：');if(!request)return;push();const r=x.getRangeAt(0),n=doc().createElement('span'),id='C'+String(++commentNo).padStart(3,'0');n.className='review-comment';n.id='anchor-'+id;n.dataset.commentId=id;n.dataset.request=request;n.dataset.section=heading(r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement);n.dataset.quote=r.toString();n.title=id+'：'+request;try{r.surroundContents(n)}catch{n.appendChild(r.extractContents());r.insertNode(n)}drawComments();status('已添加批注 '+id)}
+function drawComments(){const box=$('#comments'),list=[...doc().querySelectorAll('[data-comment-id]')];if(!list.length){box.className='empty';box.textContent='当前没有批注。';return}box.className='';box.innerHTML='';list.forEach(n=>{const c=document.createElement('div');c.className='comment';c.innerHTML=`<b>${esc(n.dataset.commentId)}</b>　${esc(n.dataset.request)}<small>${esc(n.dataset.section)}｜${esc(n.dataset.quote||n.textContent).slice(0,80)}</small>`;c.onclick=()=>n.scrollIntoView({behavior:'smooth',block:'center'});box.appendChild(c)})}
+function esc(t=''){return t.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function commentsData(out){return[...out.querySelectorAll('[data-comment-id]')].map(n=>({id:n.dataset.commentId,section:n.dataset.section,quote:n.dataset.quote||n.textContent,request:n.dataset.request}))}
+function addSidebar(out,items){const side=out.createElement('aside');side.id='review-comments-sidebar';side.innerHTML='<h2>作者批注</h2>'+items.map(i=>`<article><b>${esc(i.id)}</b><p>${esc(i.request)}</p><small>${esc(i.section)}｜${esc(i.quote)}</small></article>`).join('');out.body.appendChild(side);const st=out.createElement('style');st.textContent='html,body{background:#fff!important}body{margin-right:330px!important}#review-comments-sidebar{position:fixed;right:0;top:0;width:310px;height:100vh;overflow:auto;background:#f7f8fa;color:#222;border-left:1px solid #ccd2d8;padding:16px;z-index:9999;font:13px Arial,sans-serif}#review-comments-sidebar h2{font-size:16px}#review-comments-sidebar article{background:#fff8d7;border-left:3px solid #d2a800;padding:9px;margin:9px 0}#review-comments-sidebar p{margin:5px 0}#review-comments-sidebar small{color:#66717c}@media(max-width:800px){body{margin-right:0!important}#review-comments-sidebar{position:static;width:auto;height:auto;border:0}}';out.head.appendChild(st)}
+function exportDoc(clean){const out=doc().cloneNode(true),items=commentsData(out);out.body.contentEditable='false';out.body.classList.remove('review-editing','hide-review');out.querySelector('#review-tool-style')?.remove();out.querySelectorAll('[contenteditable]').forEach(n=>n.removeAttribute('contenteditable'));
+  if(clean){out.querySelectorAll('[data-comment-id]').forEach(n=>{if(n.closest('del[data-change]')){const mark=out.createElement('sup');mark.id=n.id;mark.textContent='['+n.dataset.commentId+']';n.closest('del[data-change]').after(mark)}else unwrap(n)});out.querySelectorAll('del[data-change]').forEach(n=>n.remove());out.querySelectorAll('ins[data-change]').forEach(unwrap)}
+  else{const st=out.createElement('style');st.textContent='ins[data-change]{color:#1565c0;text-decoration:underline;background:#e9f3ff}del[data-change]{color:#c62828;text-decoration:line-through;background:#ffeded}.review-comment{background:#fff0a8;border-bottom:2px solid #d2a800}';out.head.appendChild(st)}
+  addSidebar(out,items);return'<!doctype html>\n'+out.documentElement.outerHTML}
+function download(text,name){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/html;charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportSelected(){const base=fileName.replace(/\.html?$/i,''),clean=$('#exportType').value==='clean';download(exportDoc(clean),base+(clean?'_清洁批注版.html':'_修订批注版.html'));status('已导出'+(clean?'清洁＋批注版':'修订＋批注版'))}
+
+const themes={white:['#dfe5eb','#ffffff','#17212b','#ffffff','#222222'],green:['#c3d9c7','#eaf3e9','#173127','#e2efdf','#24352b'],wood:['#d4bea0','#f2e7d6','#3b2b20','#eadbc5','#342a22'],dark:['#12161a','#20262d','#eef3f8','#22282f','#edf2f7']};let currentTheme='white';
+function applyTheme(key,color){currentTheme=key;let t=themes[key];if(key==='custom'){const dark=luminance(color)<.38;t=[color,dark?'#24282e':'#ffffff',dark?'#f1f5f9':'#17212b',color,dark?'#f5f5f5':'#222222']}const r=document.documentElement.style;r.setProperty('--bg',t[0]);r.setProperty('--panel',t[1]);r.setProperty('--ink',t[2]);r.setProperty('--paper',t[3]);r.setProperty('--paper-ink',t[4]);document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x.dataset.theme===key));if(ready){doc().body.style.setProperty('--editor-paper',t[3]);doc().body.style.setProperty('--editor-ink',t[4])}}
+function luminance(hex){const n=parseInt(hex.slice(1),16);return(.2126*((n>>16)&255)+.7152*((n>>8)&255)+.0722*(n&255))/255}
+
+$('#open').onclick=()=>$('#file').click();$('#file').onchange=e=>load(e.target.files[0]);mode.onchange=e=>setMode(e.target.value);$('#undo').onclick=undo;$('#redo').onclick=redo;$('#comment').onclick=addComment;
+$('#accept').onclick=()=>{const n=chosen();if(n){push();acceptNode(n);drawComments()}};$('#reject').onclick=()=>{const n=chosen();if(n){push();rejectNode(n);drawComments()}};
+$('#acceptAll').onclick=()=>{push();[...doc().querySelectorAll('ins[data-change],del[data-change]')].forEach(acceptNode);drawComments();status('已接受全部修订')};$('#rejectAll').onclick=()=>{push();[...doc().querySelectorAll('ins[data-change],del[data-change]')].reverse().forEach(rejectNode);drawComments();status('已拒绝全部修订')};
+$('#toggle').onclick=()=>{showMarks=!showMarks;doc().body.classList.toggle('hide-review',!showMarks);$('#toggle').textContent=showMarks?'隐藏修订':'显示修订'};$('#export').onclick=exportSelected;
+document.querySelectorAll('.swatch').forEach(x=>x.onclick=()=>applyTheme(x.dataset.theme));$('#customColor').oninput=e=>applyTheme('custom',e.target.value);
+['dragenter','dragover'].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();$('#drop').classList.remove('hidden')}));document.addEventListener('dragleave',e=>{if(!e.relatedTarget&&ready)$('#drop').classList.add('hidden')});document.addEventListener('drop',e=>{e.preventDefault();load(e.dataTransfer.files[0])});
+console.assert($('#open')&&frame&&$('#export')&&themes.green,'工具初始化失败');
+</script>
+</body>
+</html>
