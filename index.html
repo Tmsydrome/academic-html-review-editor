@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HTML修订批注工具 v0.3.6</title>
+<title>HTML修订批注工具 v0.3.7</title>
 <style>
 :root{--bg:#e9eef3;--panel:#fff;--ink:#17212b;--muted:#687787;--line:#d5dce3;--accent:#2563eb;--paper:#fff;--paper-ink:#222}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:600 14px "Microsoft YaHei",Arial,sans-serif;transition:.2s}
@@ -19,7 +19,7 @@ aside{padding:14px;overflow:auto}aside h2{margin:0 0 10px;font-size:15px}.commen
 </head>
 <body>
 <header><div class="bar">
-  <span class="brand">HTML修订批注工具 v0.3.6</span>
+  <span class="brand">HTML修订批注工具 v0.3.7</span>
   <div class="group"><button id="open" class="primary">导入HTML</button><select id="mode" disabled><option value="track">修订模式</option><option value="edit">直接编辑</option></select></div>
   <div class="group"><button id="undo" disabled title="Ctrl+Z">撤销</button><button id="redo" disabled title="Ctrl+Y / Ctrl+Shift+Z">重做</button><button id="toggle" disabled>隐藏修订</button></div>
   <div class="group marker-wrap" title="选中文字后，从常用颜色中选择标记；再次选择同色可取消标记"><button id="markerToggle" disabled>文本标记 ▾</button><div id="markerMenu" class="marker-menu" hidden><button class="marker-color" data-marker="yellow" disabled title="黄色标记"></button><button class="marker-color" data-marker="red" disabled title="红色标记"></button><button class="marker-color" data-marker="blue" disabled title="蓝色标记"></button><button class="marker-color" data-marker="green" disabled title="绿色标记"></button><button class="marker-color" data-marker="orange" disabled title="橙色标记"></button><button class="marker-color" data-marker="purple" disabled title="紫色标记"></button><button class="marker-color" data-marker="gray" disabled title="灰色标记"></button></div></div>
@@ -57,7 +57,7 @@ function markerAt(n){return parentAt(n)?.closest('[data-marker-color]')}
 function applyTextMarker(key){const r=selectedRange(),color=markerColors[key];if(!r||r.collapsed)return status('请先选择需要标识的文字');const first=markerAt(r.startContainer),last=markerAt(r.endContainer);push();if(first&&first===last&&first.dataset.markerColor===key){unwrap(first);savedRange=null;status('已取消'+color.name+'标记');return}const mark=doc().createElement('span');mark.dataset.markerColor=key;mark.className='text-marker marker-'+key;mark.style.color=color.text;mark.style.backgroundColor=color.bg;try{r.surroundContents(mark)}catch{mark.appendChild(r.extractContents());r.insertNode(mark)}const x=selection(),after=doc().createRange();after.setStartAfter(mark);after.collapse(true);x.removeAllRanges();x.addRange(after);savedRange=null;status('已添加'+color.name+'标记')}
 function change(tag,text=''){const n=doc().createElement(tag);n.dataset.change='1';n.textContent=text;return n}
 function put(text,br=false){const x=selection();if(!x.rangeCount)return;const r=x.getRangeAt(0),p=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement,existing=p.closest('ins[data-change]');if(!r.collapsed)deleteRange(r);const n=existing?(br?doc().createElement('br'):doc().createTextNode(text||'')):change('ins',text||'');if(!existing&&br)n.appendChild(doc().createElement('br'));r.insertNode(n);r.setStartAfter(n);r.collapse(true);x.removeAllRanges();x.addRange(r)}
-function deleteRange(r){if(r.collapsed)return;const common=r.commonAncestorContainer.nodeType===1?r.commonAncestorContainer:r.commonAncestorContainer.parentElement;if(common.closest('ins[data-change]')){r.deleteContents();return}const n=change('del');n.appendChild(r.extractContents());r.insertNode(n);r.setStartAfter(n);r.collapse(true)}
+function deleteRange(r){if(r.collapsed)return;const common=r.commonAncestorContainer.nodeType===1?r.commonAncestorContainer:r.commonAncestorContainer.parentElement;if(common.closest('ins[data-change]')){r.deleteContents()}else{const n=change('del');n.appendChild(r.extractContents());r.insertNode(n);r.setStartAfter(n);r.collapse(true)}const x=selection();x.removeAllRanges();x.addRange(r)}
 function usable(n){return n?.nodeType===3&&n.length&&!n.parentElement.closest('del[data-change],script,style')}
 function edgeText(node,last){if(!node)return null;if(usable(node))return node;if(node.nodeType===1&&node.closest('del[data-change],script,style'))return null;const kids=[...node.childNodes];if(last)kids.reverse();for(const k of kids){const found=edgeText(k,last);if(found)return found}return null}
 function adjacent(back){const x=selection();if(!x.rangeCount)return null;const r=x.getRangeAt(0),c=r.startContainer,o=r.startOffset;if(c.nodeType===3){if(back&&o>0)return[c,o-1];if(!back&&o<c.length)return[c,o];let n=c;while(n&&n!==doc().body){const sib=back?n.previousSibling:n.nextSibling;if(sib){const t=edgeText(sib,back);if(t)return[t,back?t.length-1:0]}n=n.parentNode}}
