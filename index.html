@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HTML修订批注工具 v0.3.4</title>
+<title>HTML修订批注工具 v0.3.5</title>
 <style>
 :root{--bg:#e9eef3;--panel:#fff;--ink:#17212b;--muted:#687787;--line:#d5dce3;--accent:#2563eb;--paper:#fff;--paper-ink:#222}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:600 14px "Microsoft YaHei",Arial,sans-serif;transition:.2s}
@@ -19,9 +19,10 @@ aside{padding:14px;overflow:auto}aside h2{margin:0 0 10px;font-size:15px}.commen
 </head>
 <body>
 <header><div class="bar">
-  <span class="brand">HTML修订批注工具</span>
+  <span class="brand">HTML修订批注工具 v0.3.5</span>
   <div class="group"><button id="open" class="primary">导入HTML</button><select id="mode" disabled><option value="track">修订模式</option><option value="edit">直接编辑</option></select></div>
   <div class="group"><button id="undo" disabled title="Ctrl+Z">撤销</button><button id="redo" disabled title="Ctrl+Y / Ctrl+Shift+Z">重做</button><button id="toggle" disabled>隐藏修订</button></div>
+  <div class="group" title="选中文字后选择字体颜色，用于内容标识；颜色会保留在两种导出版本中"><span>字体颜色</span><input id="fontColor" type="color" value="#c62828" disabled title="为所选文字设置字体颜色"></div>
   <div class="group"><button id="comment" disabled>添加批注</button><button id="accept" disabled>接受所选</button><button id="reject" disabled>拒绝所选</button><button id="acceptAll" disabled>接受全部</button><button id="rejectAll" disabled>拒绝全部</button></div>
   <div class="group"><select id="exportType" disabled><option value="review">修订＋批注版</option><option value="clean">清洁＋批注版</option></select><button id="export" disabled>导出所选版本</button></div>
   <div class="group" title="编辑界面主题，导出统一为白色"><button class="swatch active" data-theme="white" aria-label="浅色"></button><button class="swatch" data-theme="green" aria-label="护眼绿"></button><button class="swatch" data-theme="wood" aria-label="木质"></button><button class="swatch" data-theme="dark" aria-label="深色"></button><input id="customColor" type="color" value="#e9eef3" title="自定义背景色"></div>
@@ -32,7 +33,7 @@ aside{padding:14px;overflow:auto}aside h2{margin:0 0 10px;font-size:15px}.commen
 <input id="file" type="file" accept=".html,.htm,text/html" hidden>
 <script>
 const $=q=>document.querySelector(q),frame=$('#frame'),mode=$('#mode'),statusEl=$('#status');
-let fileName='document.html',ready=false,commentNo=0,showMarks=true,undoStack=[],redoStack=[],compositionInfo=null;
+let fileName='document.html',ready=false,commentNo=0,showMarks=true,undoStack=[],redoStack=[],compositionInfo=null,savedRange=null;
 const doc=()=>frame.contentDocument,win=()=>frame.contentWindow,selection=()=>win().getSelection(),status=t=>statusEl.textContent=t;
 const editorStyle=`<style id="review-tool-style">body.review-editing{outline:none;background:var(--editor-paper,#fff)!important;color:var(--editor-ink,#222)!important;min-height:100vh}ins[data-change]{color:#1565c0;text-decoration:underline;background:#e9f3ff}del[data-change]{color:#c62828;text-decoration:line-through;background:#ffeded}.review-comment{background:#fff0a8;border-bottom:2px solid #d2a800}.hide-review del[data-change]{display:none}.hide-review ins[data-change]{color:inherit;text-decoration:none;background:none}</style>`;
 const snapshot=()=>({html:doc().body.innerHTML,commentNo});
@@ -45,9 +46,12 @@ function redo(){if(!redoStack.length)return;undoStack.push(snapshot());restore(r
 async function load(file){
   if(!file?.name.match(/\.html?$/i))return status('请选择HTML文件');fileName=file.name;
   frame.srcdoc=(await file.text()).replace(/<\/head>/i,editorStyle+'</head>');
-  frame.onload=()=>{ready=true;undoStack=[];redoStack=[];commentNo=0;const d=doc();d.body.classList.add('review-editing');d.addEventListener('beforeinput',beforeInput,true);d.addEventListener('paste',paste,true);d.addEventListener('compositionstart',compositionStart);d.addEventListener('compositionend',compositionEnd);d.addEventListener('keydown',shortcuts,true);setMode('track');document.querySelectorAll('button:not(#open),select').forEach(x=>x.disabled=false);historyButtons();$('#drop').classList.add('hidden');applyTheme(currentTheme);drawComments();status('已导入并进入修订模式：'+fileName)};
+  frame.onload=()=>{ready=true;undoStack=[];redoStack=[];commentNo=0;savedRange=null;const d=doc();d.body.classList.add('review-editing');d.addEventListener('beforeinput',beforeInput,true);d.addEventListener('paste',paste,true);d.addEventListener('compositionstart',compositionStart);d.addEventListener('compositionend',compositionEnd);d.addEventListener('keydown',shortcuts,true);setMode('track');document.querySelectorAll('button:not(#open),select,#fontColor').forEach(x=>x.disabled=false);historyButtons();$('#drop').classList.add('hidden');applyTheme(currentTheme);drawComments();status('已导入并进入修订模式：'+fileName)};
 }
 function setMode(v){doc().body.contentEditable='true';mode.value=v;status(v==='edit'?'直接编辑模式':'修订模式')}
+function rememberSelection(){const x=selection();savedRange=x?.rangeCount&&!x.isCollapsed?x.getRangeAt(0).cloneRange():null}
+function selectedRange(){const x=selection();return x?.rangeCount&&!x.isCollapsed?x.getRangeAt(0):savedRange?.cloneRange()}
+function applyFontColor(color){const r=selectedRange();if(!r||r.collapsed)return status('请先选择需要标识的文字');const x=selection();x.removeAllRanges();x.addRange(r);push();doc().execCommand('styleWithCSS',false,true);if(!doc().execCommand('foreColor',false,color))return status('未能设置字体颜色');savedRange=null;status('已将所选文字标识为 '+color)}
 function change(tag,text=''){const n=doc().createElement(tag);n.dataset.change='1';n.textContent=text;return n}
 function put(text,br=false){const x=selection();if(!x.rangeCount)return;const r=x.getRangeAt(0),p=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement,existing=p.closest('ins[data-change]');if(!r.collapsed)deleteRange(r);const n=existing?(br?doc().createElement('br'):doc().createTextNode(text||'')):change('ins',text||'');if(!existing&&br)n.appendChild(doc().createElement('br'));r.insertNode(n);r.setStartAfter(n);r.collapse(true);x.removeAllRanges();x.addRange(r)}
 function deleteRange(r){if(r.collapsed)return;const common=r.commonAncestorContainer.nodeType===1?r.commonAncestorContainer:r.commonAncestorContainer.parentElement;if(common.closest('ins[data-change]')){r.deleteContents();return}const n=change('del');n.appendChild(r.extractContents());r.insertNode(n);r.setStartAfter(n);r.collapse(true)}
@@ -100,6 +104,7 @@ $('#open').onclick=()=>$('#file').click();$('#file').onchange=e=>load(e.target.f
 $('#accept').onclick=()=>{const n=chosen();if(n){push();acceptNode(n);drawComments()}};$('#reject').onclick=()=>{const n=chosen();if(n){push();rejectNode(n);drawComments()}};
 $('#acceptAll').onclick=()=>{push();[...doc().querySelectorAll('ins[data-change],del[data-change]')].forEach(acceptNode);drawComments();status('已接受全部修订')};$('#rejectAll').onclick=()=>{push();[...doc().querySelectorAll('ins[data-change],del[data-change]')].reverse().forEach(rejectNode);drawComments();status('已拒绝全部修订')};
 $('#toggle').onclick=()=>{showMarks=!showMarks;doc().body.classList.toggle('hide-review',!showMarks);$('#toggle').textContent=showMarks?'隐藏修订':'显示修订'};$('#export').onclick=exportSelected;
+$('#fontColor').addEventListener('pointerdown',rememberSelection);$('#fontColor').addEventListener('change',e=>applyFontColor(e.target.value));
 document.querySelectorAll('.swatch').forEach(x=>x.onclick=()=>applyTheme(x.dataset.theme));$('#customColor').oninput=e=>applyTheme('custom',e.target.value);
 ['dragenter','dragover'].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();$('#drop').classList.remove('hidden')}));document.addEventListener('dragleave',e=>{if(!e.relatedTarget&&ready)$('#drop').classList.add('hidden')});document.addEventListener('drop',e=>{e.preventDefault();load(e.dataTransfer.files[0])});
 console.assert($('#open')&&frame&&$('#export')&&themes.green,'工具初始化失败');
