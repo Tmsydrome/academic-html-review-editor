@@ -7,6 +7,7 @@ A lightweight, offline, single-file HTML editor for academic revision tracking a
 - Runs locally in a modern browser with no installation or server.
 - Tracks additions and deletions with semantic `<ins>` and `<del>` markup.
 - Supports Chinese IME input, selection replacement, undo/redo, and change visibility.
+- Includes a one-click revision-trace switch for moving between marked-up and integrated reading views.
 - Provides persistent text-marking mode with seven high-visibility color presets.
 - Includes a freehand drawing pen with adjustable stroke width, arbitrary color selection, and a size-matched circular cursor.
 - Attaches structured editing requests to selected text as comments.
@@ -33,7 +34,7 @@ All processing occurs locally in the browser. No document content is uploaded.
 
 ## 中文说明
 
-这是一个离线运行的单文件 HTML 学术修订工具，支持增删留痕、中文输入、撤销重做、连续文本标记、自由画笔、定点批注，以及修订批注版和清洁批注版导出。双击 `index.html` 即可使用，无需安装或联网。
+这是一个离线运行的单文件 HTML 学术修订工具，支持增删留痕、修订痕迹一键切换、中文输入、撤销重做、连续文本标记、自由画笔、定点批注，以及修订批注版和清洁批注版导出。双击 `index.html` 即可使用，无需安装或联网。
 
 ## License
 

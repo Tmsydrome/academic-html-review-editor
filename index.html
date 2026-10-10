@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HTML修订批注工具 v0.4.4</title>
+<title>HTML修订批注工具 v0.4.5</title>
 <style>
 :root{--bg:#e9eef3;--panel:#fff;--ink:#17212b;--muted:#687787;--line:#d5dce3;--accent:#2563eb;--paper:#fff;--paper-ink:#222}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:600 14px "Microsoft YaHei",Arial,sans-serif;transition:.2s}
@@ -16,7 +16,7 @@ aside{padding:14px;overflow:auto}aside h2{margin:0 0 10px;font-size:15px}.commen
 #drop{position:fixed;inset:72px 22px 22px;z-index:20;display:grid;place-items:center;border:2px dashed #91a2b4;border-radius:14px;background:color-mix(in srgb,var(--panel) 94%,transparent);text-align:center;color:var(--muted);backdrop-filter:blur(8px)}#drop strong{display:block;margin-bottom:7px;color:var(--ink);font-size:21px}#drop.hidden{display:none}
 @media(max-width:1050px){.brand{width:100%}#status{width:100%;margin:0}.layout{height:calc(100vh - 94px)}}@media(max-width:780px){.layout{grid-template-columns:1fr;height:auto}.paper{height:72vh}aside{height:25vh}.group{border:0}}
 
-/* v0.4.4: compact start screen and developer identity */
+/* v0.4.5: revision visibility switch */
 body{background:linear-gradient(145deg,#f5f8fb 0%,#edf2f7 62%,#e7edf4 100%)}
 header{background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(16px);box-shadow:0 4px 18px #13253b0d}
 .bar{max-width:1800px;min-height:64px;padding:10px 18px;gap:9px}.brand{font-size:16px;font-weight:800;letter-spacing:-.02em}.group{align-items:center;gap:6px;padding-right:9px}
@@ -27,13 +27,14 @@ button,select,input[type=color]{height:38px;border-radius:10px;box-shadow:0 1px 
 .empty-card strong{display:block;margin:0 0 10px;color:var(--ink);font-size:24px;letter-spacing:-.02em}.empty-card p{margin:0 0 24px;font-weight:500;line-height:1.75}.empty-card button{min-width:148px}.drop-hint{display:block;margin-top:15px;font-size:12px;font-weight:500;color:#8795a5}
 body:not(.document-ready) .doc-tools,body:not(.document-ready) #mode{display:none}body:not(.document-ready) .layout{visibility:hidden}.document-ready .bar{max-width:none}.document-ready #status{margin-left:0}.document-ready .creator-profile{margin-left:auto}
 @media(max-width:780px){.bar{padding:9px 12px}.brand{width:auto;font-size:15px}.creator-logo{width:40px;height:40px}.empty-card{padding:40px 22px}.empty-card strong{font-size:21px}}
+.revision-switch{display:inline-flex;align-items:center;gap:7px;min-width:126px;padding:0 10px}.revision-switch .switch-track{position:relative;flex:none;width:32px;height:18px;border-radius:999px;background:#a8b3bf;transition:.18s}.revision-switch .switch-knob{position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #17212b42;transition:.18s}.revision-switch.active .switch-track{background:var(--accent)}.revision-switch.active .switch-knob{transform:translateX(14px)}.revision-switch.active{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));color:var(--accent)}
 </style>
 </head>
 <body>
 <header><div class="bar">
-  <span class="brand">HTML修订批注工具 v0.4.4</span>
+  <span class="brand">HTML修订批注工具 v0.4.5</span>
   <div class="group"><button id="open" class="primary">导入HTML</button><select id="mode" disabled><option value="track">修订模式</option><option value="edit">直接编辑</option></select></div>
-  <div class="group doc-tools"><button id="undo" disabled title="Ctrl+Z">撤销</button><button id="redo" disabled title="Ctrl+Y / Ctrl+Shift+Z">重做</button><button id="toggle" disabled>隐藏修订</button></div>
+  <div class="group doc-tools"><button id="undo" disabled title="Ctrl+Z">撤销</button><button id="redo" disabled title="Ctrl+Y / Ctrl+Shift+Z">重做</button><button id="toggle" class="revision-switch active" disabled aria-pressed="true" title="切换修订痕迹的显示状态"><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span><span id="toggleLabel">修订痕迹：显示</span></button></div>
   <div class="group marker-wrap doc-tools"><button id="markerSwitch" class="marker-switch" disabled aria-pressed="false" title="打开后，划选文字会自动使用当前颜色标记">文本标记：关</button><button id="markerColorToggle" class="marker-current" disabled aria-label="选择标记颜色" title="选择标记颜色"></button><div id="markerMenu" class="marker-menu" hidden><button class="marker-color" data-marker="yellow" disabled title="黄色标记"></button><button class="marker-color" data-marker="red" disabled title="红色标记"></button><button class="marker-color" data-marker="blue" disabled title="蓝色标记"></button><button class="marker-color" data-marker="green" disabled title="绿色标记"></button><button class="marker-color" data-marker="orange" disabled title="橙色标记"></button><button class="marker-color" data-marker="purple" disabled title="紫色标记"></button><button class="marker-color" data-marker="gray" disabled title="灰色标记"></button></div></div>
   <div class="group pen-settings doc-tools"><button id="penSwitch" class="pen-switch" disabled aria-pressed="false" title="打开后可在正文上自由绘画">画笔：关</button><label title="画笔粗细">粗细<input id="penSize" type="range" min="1" max="24" step="1" value="4" disabled><output id="penSizeValue">4</output></label><input id="penColor" type="color" value="#e53935" disabled title="自由选择画笔颜色"></div>
   <div class="group doc-tools"><button id="comment" disabled>添加批注</button><button id="accept" disabled>接受所选</button><button id="reject" disabled>拒绝所选</button><button id="acceptAll" disabled>接受全部</button><button id="rejectAll" disabled>拒绝全部</button></div>
@@ -139,7 +140,8 @@ function luminance(hex){const n=parseInt(hex.slice(1),16);return(.2126*((n>>16)&
 $('#open').onclick=()=>$('#file').click();$('#dropOpen').onclick=()=>$('#file').click();$('#file').onchange=e=>load(e.target.files[0]);mode.onchange=e=>setMode(e.target.value);$('#undo').onclick=undo;$('#redo').onclick=redo;$('#comment').onclick=addComment;
 $('#accept').onclick=()=>{const n=chosen();if(n){push();acceptNode(n);drawComments()}};$('#reject').onclick=()=>{const n=chosen();if(n){push();rejectNode(n);drawComments()}};
 $('#acceptAll').onclick=()=>{push();[...doc().querySelectorAll('ins[data-change],del[data-change]')].forEach(acceptNode);drawComments();status('已接受全部修订')};$('#rejectAll').onclick=()=>{push();[...doc().querySelectorAll('ins[data-change],del[data-change]')].reverse().forEach(rejectNode);drawComments();status('已拒绝全部修订')};
-$('#toggle').onclick=()=>{showMarks=!showMarks;doc().body.classList.toggle('hide-review',!showMarks);$('#toggle').textContent=showMarks?'隐藏修订':'显示修订'};$('#export').onclick=exportSelected;
+function updateRevisionSwitch(){const b=$('#toggle');b.classList.toggle('active',showMarks);b.setAttribute('aria-pressed',String(showMarks));$('#toggleLabel').textContent='修订痕迹：'+(showMarks?'显示':'隐藏')}
+$('#toggle').onclick=()=>{showMarks=!showMarks;doc().body.classList.toggle('hide-review',!showMarks);updateRevisionSwitch();status(showMarks?'已显示修订痕迹':'已隐藏修订痕迹，当前显示整合正文')};updateRevisionSwitch();$('#export').onclick=exportSelected;
 $('#markerSwitch').onclick=()=>setMarkerMode(!markerMode);$('#markerColorToggle').addEventListener('pointerdown',e=>{rememberSelection();e.preventDefault()});$('#markerColorToggle').onclick=e=>{e.stopPropagation();$('#markerMenu').hidden=!$('#markerMenu').hidden};$('#markerMenu').onclick=e=>e.stopPropagation();document.querySelectorAll('.marker-color').forEach(b=>{b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=()=>{activeMarker=b.dataset.marker;updateMarkerControls();if(savedRange)applyTextMarker(activeMarker,false);$('#markerMenu').hidden=true}});document.addEventListener('click',()=>$('#markerMenu').hidden=true);updateMarkerControls();
 $('#penSwitch').onclick=()=>setPenMode(!penMode);$('#penSize').oninput=e=>{penSize=Number(e.target.value);updatePenControls();if(ready)ensurePenCursor()};$('#penColor').oninput=e=>{penColor=e.target.value;if(ready)ensurePenCursor();status('画笔颜色：'+penColor)};updatePenControls();
 document.querySelectorAll('.swatch').forEach(x=>x.onclick=()=>applyTheme(x.dataset.theme));$('#customColor').oninput=e=>applyTheme('custom',e.target.value);
